@@ -1,0 +1,5 @@
+venv/
+memory_index/  
+json/
+uploads/
+faiss/
