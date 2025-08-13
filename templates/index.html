@@ -1,180 +1,129 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI Assistant</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config = { darkMode: 'class' }</script>
+<meta charset="utf-8">
+<title>Advanced AI Assistant</title>
+<script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-6">
-  <div class="w-full max-w-3xl bg-gray-800 rounded-2xl shadow-xl p-6 space-y-6">
-    <div class="flex justify-between items-center">
-      <h1 class="text-2xl font-semibold">Local AI Assistant</h1>
-      <div id="indexInfo" class="text-sm text-gray-300">Index: 0 chunks</div>
-    </div>
+<body class="bg-gray-900 text-white p-4">
+<div class="max-w-6xl mx-auto space-y-6">
 
-    <div class="grid grid-cols-1 gap-4">
-      <!-- Upload card -->
-      <div class="bg-gray-700 p-4 rounded-lg">
-        <label class="block text-sm font-medium mb-2">Upload file (txt / md / pdf)</label>
-        <div class="flex gap-3">
-          <input id="fileInput" type="file" class="flex-1 text-sm text-gray-200 file:py-2 file:px-4 file:rounded-full file:bg-blue-600 file:text-white" />
-          <button onclick="uploadFile()" class="bg-green-600 px-4 py-2 rounded-md hover:bg-green-700">Upload</button>
-        </div>
-        <p id="uploadStatus" class="mt-2 text-sm text-gray-300"></p>
-      </div>
-
-      <!-- Ask card -->
-      <div class="bg-gray-700 p-4 rounded-lg">
-        <label class="block text-sm font-medium mb-2">Ask anything</label>
-        <textarea id="questionInput" rows="4" class="w-full p-3 bg-gray-800 rounded-md text-white border border-gray-600" placeholder="Type question..."></textarea>
-        <div class="flex gap-3 mt-3 items-center">
-          <button onclick="askAI()" class="bg-blue-600 px-4 py-2 rounded-md hover:bg-blue-700">Ask AI</button>
-          <button onclick="clearUI()" class="bg-gray-600 px-4 py-2 rounded-md hover:bg-gray-500">Clear</button>
-          <button id="startRecBtn" class="bg-purple-600 px-4 py-2 rounded-md hover:bg-purple-700">Speak</button>
-        </div>
-      </div>
-
-      <!-- Response -->
-      <div class="bg-gray-700 p-4 rounded-lg min-h-[120px]">
-        <div id="responseBox" class="prose prose-invert text-gray-200 whitespace-pre-wrap"></div>
-      </div>
+  <!-- Header & Stats -->
+  <div class="flex flex-col md:flex-row justify-between gap-4">
+    <h1 class="text-2xl font-bold flex items-center gap-2"> Advanced AI Assistant</h1>
+    <div class="flex flex-col sm:flex-row gap-2 text-sm">
+      <div class="bg-gray-800 px-3 py-2 rounded shadow" id="indexInfo">Chunks: 0</div>
+      <div class="bg-gray-800 px-3 py-2 rounded shadow" id="queryStats">Loading stats...</div>
     </div>
   </div>
 
+  <!-- File Manager -->
+  <div class="bg-gray-800 p-4 rounded shadow space-y-3">
+    <h2 class="text-lg font-semibold">File Manager</h2>
+    <div class="flex flex-col sm:flex-row gap-3">
+      <input type="file" id="fileInput" class="flex-1 file:mr-3 file:py-2 file:px-4 file:border-0 
+             file:rounded file:bg-blue-600 file:text-white text-gray-300 text-sm">
+      <button onclick="uploadFile()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">Upload</button>
+    </div>
+    <div id="uploadStatus" class="text-sm text-gray-300"></div>
+    <div id="fileTable" class="overflow-x-auto"></div>
+  </div>
+
+  <!-- Ask -->
+  <div class="bg-gray-800 p-4 rounded shadow space-y-2">
+    <textarea id="questionInput" rows="3" placeholder="Ask anything..." 
+      class="w-full p-3 rounded text-white bg-gray-900 border border-gray-700 focus:outline-none"></textarea>
+    <div class="flex gap-3">
+      <button onclick="askAI()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">Ask</button>
+      <button onclick="clearUI()" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded">Clear</button>
+    </div>
+  </div>
+
+  <!-- Response -->
+  <div class="bg-gray-800 p-4 rounded shadow space-y-3">
+    <div id="responseBox" class="min-h-[120px] whitespace-pre-wrap overflow-y-auto"></div>
+    <div id="suggestions" class="text-sm text-gray-300"></div>
+  </div>
+
+</div>
+
 <script>
-async function refreshIndexInfo(){
-  try{
-    const r = await fetch('/index_info');
-    if(r.ok){
-      const d = await r.json();
-      document.getElementById('indexInfo').innerText = `Index: ${d.chunks} chunks`;
-    }
-  }catch(e){}
+async function refreshFiles(){
+  const r = await fetch('/files'); const data = await r.json();
+  let html = `
+  <table class="text-sm w-full border border-gray-700">
+    <thead class="bg-gray-700">
+      <tr>
+        <th class="p-2 text-left">File</th>
+        <th class="p-2 text-center">Chunks</th>
+        <th class="p-2 text-center">Queries</th>
+        <th class="p-2 text-center">Action</th>
+      </tr>
+    </thead><tbody>`;
+  for (let [f,info] of Object.entries(data)){
+    html += `
+      <tr class="border-t border-gray-700">
+        <td class="p-2">${f}</td>
+        <td class="p-2 text-center">${info.chunks}</td>
+        <td class="p-2 text-center">${info.queries}</td>
+        <td class="p-2 text-center">
+          <button onclick="deleteFile('${f.split('/').pop()}')" class="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs">Delete</button>
+        </td>
+      </tr>`;
+  }
+  html += `</tbody></table>`;
+  document.getElementById('fileTable').innerHTML = html;
 }
-refreshIndexInfo();
+
+async function refreshStats(){
+  let res = await fetch('/index_info'); let d = await res.json();
+  document.getElementById('indexInfo').innerText = `Chunks: ${d.chunks}`;
+  res = await fetch('/query_stats'); d = await res.json();
+  let s = []; for(let [f,c] of Object.entries(d)){ s.push(`${f}: ${c}`) }
+  document.getElementById('queryStats').innerText = s.length ? s.join(" | ") : "No queries yet";
+}
 
 async function uploadFile(){
-  const fi = document.getElementById('fileInput');
-  if(!fi.files.length) return alert('Select a file first');
-  const fd = new FormData();
-  fd.append('file', fi.files[0]);
-  document.getElementById('uploadStatus').innerText = 'Uploading...';
-  try{
-    const res = await fetch('/upload', { method: 'POST', body: fd });
-    const data = await res.json();
-    if(data.success){
-      document.getElementById('uploadStatus').innerText = ` ${data.filename} (added ${data.added_chunks} chunks)`;
-      refreshIndexInfo();
-    } else {
-      document.getElementById('uploadStatus').innerText = ` ${data.error || 'upload failed'}`;
-    }
-  }catch(err){
-    document.getElementById('uploadStatus').innerText = ' Upload error: ' + err.message;
+  let f = document.getElementById('fileInput').files[0];
+  if(!f) return alert("Select a file first!");
+  let fd = new FormData(); fd.append('file',f);
+  let r = await fetch('/upload', { method:'POST', body: fd });
+  let d = await r.json();
+  if(d.success){
+    document.getElementById('uploadStatus').innerText = `Uploaded ${d.filename}`;
+    if(d.summary)
+      document.getElementById('uploadStatus').innerHTML += `<br><b>Summary:</b> ${d.summary}`;
+    refreshFiles(); refreshStats();
+  } else {
+    document.getElementById('uploadStatus').innerText = d.error || "Upload failed";
   }
-}
-
-function clearUI(){
-  document.getElementById('questionInput').value = '';
-  document.getElementById('responseBox').innerHTML = '';
 }
 
 async function askAI(){
-  const q = document.getElementById('questionInput').value.trim();
-  if(!q) return alert('Type a question');
-  document.getElementById('responseBox').innerText = 'Thinking...';
-  try{
-    const res = await fetch('/ask', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ question: q })
-    });
-    const data = await res.json();
-    if(data.answer) {
-      document.getElementById('responseBox').innerText = data.answer;
-      speakResponse(data.answer);
-    } else if (data.error) {
-      document.getElementById('responseBox').innerText = 'Error: ' + (data.error || JSON.stringify(data));
-    } else {
-      document.getElementById('responseBox').innerText = 'No response';
-    }
-  }catch(err){
-    document.getElementById('responseBox').innerText = 'Request failed: ' + err.message;
+  let q = document.getElementById('questionInput').value.trim();
+  if(!q) return alert("Enter your question");
+  document.getElementById('responseBox').innerText = "Thinking...";
+  let r = await fetch('/ask', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question:q}) });
+  let d = await r.json();
+  document.getElementById('responseBox').innerText = d.answer || ("Error: "+d.error);
+  if(d.suggestions){
+    document.getElementById('suggestions').innerHTML = "<b>Follow-up:</b> "+d.suggestions.join(" | ");
   }
+  refreshStats();
 }
 
-// Voice recognition integration with improved error handling & toggle button text
-const startRecBtn = document.getElementById('startRecBtn');
-const questionInput = document.getElementById('questionInput');
-
-let recognition = null;
-let isRecording = false;
-
-startRecBtn.onclick = () => {
-  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-    alert('Your browser does not support speech recognition. Please type your question.');
-    return;
-  }
-
-  if (isRecording) {
-    recognition.stop();
-    return;
-  }
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SpeechRecognition();
-  recognition.lang = 'en-IN';  // Hindi + English (Hinglish)
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-
-  recognition.onstart = () => {
-    isRecording = true;
-    startRecBtn.innerText = 'Stop';
-  };
-
-  recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
-    questionInput.value = transcript;
-  };
-
-  recognition.onerror = (event) => {
-    let msg = event.error === 'network' 
-      ? 'Network error: Please check your internet connection and try again.'
-      : `Speech recognition error: ${event.error}`;
-    alert(msg);
-    stopRecognition();
-  };
-
-  recognition.onend = () => {
-    stopRecognition();
-  };
-
-  function stopRecognition() {
-    isRecording = false;
-    startRecBtn.innerText = 'Speak';
-  }
-
-  recognition.start();
-};
-
-// Text-to-Speech to speak AI response
-function speakResponse(text) {
-  if (!('speechSynthesis' in window)) {
-    // No TTS support
-    return;
-  }
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-US'; // Change to 'en-IN' if you want Indian accent
-  speechSynthesis.speak(utterance);
+async function deleteFile(name){
+  await fetch('/delete_file', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({filename:name}) });
+  refreshFiles(); refreshStats();
 }
 
-// Greet user on page load with voice message
-window.onload = () => {
-  const greeting = "Hi, how can I help you today?";
-  document.getElementById('responseBox').innerText = greeting;
-  speakResponse(greeting);
-};
+function clearUI(){
+  document.getElementById('responseBox').innerText = "";
+  document.getElementById('suggestions').innerText = "";
+}
+
+refreshFiles();
+refreshStats();
 </script>
 </body>
 </html>
