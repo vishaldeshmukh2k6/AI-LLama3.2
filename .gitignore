@@ -3,3 +3,4 @@ memory_index/
 json/
 uploads/
 faiss/
+__pycache__/
